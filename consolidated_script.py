@@ -11,11 +11,14 @@ from scipy.stats.distributions import chi2
 # %%
 # Input parameters
 # Example combination of parameters for 14 bus system-> 14,500,13
-num_of_bus = 14  #  Number of buses in the system
-num_of_datasets = 500  #  Number of datasets to be generated
-k_value = 13  #  Value of K for KNN
+num_of_bus = int(input("Enter number of bus [5,14,30 etc] : "))  #  Number of buses in the system
+num_of_datasets = int(input("Total number of datasets [half will be trained, half will be predicted] [500,800,...] : "))  #  Number of datasets to be generated
+k_value = int(input("Value of k [for KNN] [11,13,17,...]: "))  #  Value of K for KNN
 print(f"FDI attack detection using KNN algorithm for {num_of_bus} bus System")
 print("*" * 50)
+
+# total time taken for script to run
+start_time = pd.Timestamp.now()
 
 # %% Import KNN algo
 from ml_algo import KNN as the_algo_for_pred
@@ -66,6 +69,8 @@ Y_org = Y.copy()
 final_H, final_Z, final_W = None, None, None
 retryFlag, idx = 0, 0
 expected_result, predicted_result = None, None
+correct_prediction,incorrect_prediction = 0,0
+
 while idx < len(multipliers):
     multiplier = multipliers[idx]
 
@@ -131,7 +136,7 @@ while idx < len(multipliers):
     # %%
     G = H.transpose() @ W @ H
 
-    # check if G is invertible
+    # check if G is Singular
     if np.linalg.det(G) == 0:
         multipliers[idx] = np.random.random() * np.random.randint(1, 100)
         idx -= 1
@@ -163,19 +168,21 @@ while idx < len(multipliers):
     else:
         result = "All data is good"
 
-    print(f"Iteration {idx+1} : {result}")
+    # print(f"Iteration {idx+1} : {result}")
+    print(f"Iteration {idx+1} is running...")
 
     # %%
     # Training the model
 
-    # Except the last dataset train all,
-    # and save the final H, Z, W
-    # model will predict the last dataset's verdict
-    if idx == len(multipliers) - 1:
-        final_H, final_Z, final_W = H, Z, W
-        expected_result = result
-        print("*" * 50)
-        print("Training completed")
+    # First half of dataset will be trained,
+    # Second half of dataset will be predicted
+    # Also using actual detection technique to check the accuracy of the model
+    if idx >= len(multipliers)//2 :
+        predicted_result = var.predict([(H,W,Z)])[0]
+        if predicted_result == result:
+            correct_prediction+=1
+        else:
+            incorrect_prediction+=1
     else:
         x_dataset = [(H, W, Z)]
         y_dataset = [result]
@@ -183,9 +190,18 @@ while idx < len(multipliers):
 
     idx += 1  # increase the index : end of while loop
 
-# %%
-# # Prediction
-var.get()
-predicted_result = var.predict([(final_H, final_W, final_Z)])[0]
-print(f"Expected result : {expected_result}")
-print(f"Predicted result : {predicted_result}")
+if retryFlag <= 10:
+    print("*" * 50)
+    print("Training completed")
+    print("*" * 50)
+    # %%
+    var.get()
+    # accuracy
+    print(f"FDI attack detection using KNN algorithm for {num_of_bus} bus System")
+    print(f"Correct prediction : {correct_prediction}")
+    print(f"Incorrect prediction : {incorrect_prediction}")
+    print(f"Accuracy : {correct_prediction/(correct_prediction+incorrect_prediction)*100}%")
+
+end_time = pd.Timestamp.now()
+# total time in seconds
+print(f"Total time taken : {(end_time-start_time).total_seconds()} seconds")
