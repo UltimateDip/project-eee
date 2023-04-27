@@ -10,8 +10,7 @@ def distance_metric(x1: tuple, x2: tuple):
     H1, W1, Z1 = x1
     H2, W2, Z2 = x2
 
-    # euclidean distance
-
+    # calculate euclidean distance
     res = np.sqrt(
         np.sum(
             [
@@ -36,8 +35,7 @@ class KNN:
 
     def get(self):
         print(f"K is {self.k}")
-        print(f"Total X_train datasets are {len(self.X_train)}")
-        print(f"Total y_train datasets are {len(self.y_train)}")
+        print(f"Total datasets trained {len(self.X_train)}")
 
     def predict(self, X):
         y_pred = [self._predict(x) for x in X]
@@ -46,11 +44,6 @@ class KNN:
     def _predict(self, x):
         distances = [distance_metric(x, x_train) for x_train in self.X_train]
         k_idxs = np.argsort(distances)[: self.k]
-
-        for idx in k_idxs:
-            print(
-                f"Index : {idx} -> Distance is {distances[idx]} and label is {self.y_train[idx]}"
-            )
 
         k_labels = [self.y_train[i] for i in k_idxs]
         most_common = Counter(k_labels).most_common(1)
