@@ -11,10 +11,18 @@ from scipy.stats.distributions import chi2
 # %%
 # Input parameters
 # Example combination of parameters for 14 bus system-> 14,500,13
-num_of_bus = int(input("Enter number of bus [5,14,30 etc] : "))  #  Number of buses in the system
-num_of_datasets = int(input("Total number of datasets [half will be trained, half will be predicted] [500,800,...] : "))  #  Number of datasets to be generated
+
+#  Number of buses in the system
+num_of_bus = int(input("Enter number of bus [5,14,30 etc] : "))
+#  Number of datasets to be generated
+num_of_datasets = int(
+    input(
+        "Total number of datasets [half will be trained, half will be predicted] [500,800,...] : "
+    )
+)
 k_value = int(input("Value of k [for KNN] [11,13,17,...]: "))  #  Value of K for KNN
-print(f"FDI attack detection using KNN algorithm for {num_of_bus} bus System")
+print("*" * 50)
+print(f"\nFDI attack detection using KNN algorithm for {num_of_bus} bus System\n")
 print("*" * 50)
 
 # total time taken for script to run
@@ -69,7 +77,7 @@ Y_org = Y.copy()
 final_H, final_Z, final_W = None, None, None
 retryFlag, idx = 0, 0
 expected_result, predicted_result = None, None
-correct_prediction,incorrect_prediction = 0,0
+TP, FP, TN, FN = 0, 0, 0, 0
 
 while idx < len(multipliers):
     multiplier = multipliers[idx]
@@ -146,7 +154,11 @@ while idx < len(multipliers):
     else:
         retryFlag = 0
 
-    X = np.linalg.inv(G) @ H.transpose() @ W @ Z
+    try:
+        X = np.linalg.inv(G) @ H.transpose() @ W @ Z
+    except np.linalg.LinAlgError as err:
+        print(pd.DataFrame(G))
+        break
 
     # %%
     Zest = H @ X  # estimated Z
@@ -167,8 +179,6 @@ while idx < len(multipliers):
         result = "Bad data detected"
     else:
         result = "All data is good"
-
-    # print(f"Iteration {idx+1} : {result}")
     print(f"Iteration {idx+1} is running...")
 
     # %%
@@ -177,12 +187,22 @@ while idx < len(multipliers):
     # First half of dataset will be trained,
     # Second half of dataset will be predicted
     # Also using actual detection technique to check the accuracy of the model
-    if idx >= len(multipliers)//2 :
-        predicted_result = var.predict([(H,W,Z)])[0]
-        if predicted_result == result:
-            correct_prediction+=1
-        else:
-            incorrect_prediction+=1
+    if idx >= len(multipliers) // 2:
+        predicted_result = var.predict([(H, W, Z)])[0]
+
+        if predicted_result == "Bad data detected" and result == "Bad data detected":
+            # true positive
+            TP += 1
+        elif predicted_result == "Bad data detected" and result == "All data is good":
+            # false positive
+            FP += 1
+        elif predicted_result == "All data is good" and result == "Bad data detected":
+            # false negative
+            FN += 1
+        elif predicted_result == "All data is good" and result == "All data is good":
+            # true negative
+            TN += 1
+
     else:
         x_dataset = [(H, W, Z)]
         y_dataset = [result]
@@ -192,15 +212,17 @@ while idx < len(multipliers):
 
 if retryFlag <= 10:
     print("*" * 50)
-    print("Training completed")
+    print("\nTraining completed\n")
     print("*" * 50)
     # %%
     var.get()
-    # accuracy
     print(f"FDI attack detection using KNN algorithm for {num_of_bus} bus System")
-    print(f"Correct prediction : {correct_prediction}")
-    print(f"Incorrect prediction : {incorrect_prediction}")
-    print(f"Accuracy : {correct_prediction/(correct_prediction+incorrect_prediction)*100}%")
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    print(f"Precision : {precision*100}%")
+    print(f"Recall : {recall*100}%")
+    print(f"Accuracy : {round(f1_score*100, 2)}%")
 
 end_time = pd.Timestamp.now()
 # total time in seconds
